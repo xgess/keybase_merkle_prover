@@ -1,0 +1,25 @@
+{
+    "_meta": {
+        "hash": {
+            "sha256": "4157efb74574721ca66c689af27d7063d56cd81bcd8f0c444c665c8e19e0c27f"
+        },
+        "pipfile-spec": 6,
+        "requires": {
+            "python_version": "3.7"
+        },
+        "sources": [
+            {
+                "name": "pypi",
+                "url": "https://pypi.python.org/simple",
+                "verify_ssl": true
+            }
+        ]
+    },
+    "default": {
+        "pykeybasebot": {
+            "git": "https://github.com/keybase/pykeybasebot.git",
+            "ref": "da8cbe9d324c9b39c3b7ddc53b61665905289193"
+        }
+    },
+    "develop": {}
+}
