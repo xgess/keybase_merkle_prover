@@ -48,4 +48,5 @@ RUN pip3 install -r requirements.txt
 COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 COPY . /app
+RUN chown keybase ./tmp
 CMD ["entrypoint.sh"]

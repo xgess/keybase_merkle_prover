@@ -7,6 +7,10 @@ name = 'pypi'
 python_version = '3.7'
 
 [dev-packages]
+ipython = "*"
 
 [packages]
-pykeybasebot = {ref = "master", git = "https://github.com/keybase/pykeybasebot.git"}
+pykeybasebot = {ref = "xgess/add-public-broadcast",git = "https://github.com/keybase/pykeybasebot.git"}
+requests = "*"
+opentimestamps = "*"
+opentimestamps-client = "*"

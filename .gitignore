@@ -1,2 +1,4 @@
 env.sh
 requirements.txt
+tmp/*data*
+.DS_Store

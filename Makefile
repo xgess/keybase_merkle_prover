@@ -1,4 +1,4 @@
-.PHONY: build run shells
+.PHONY: build run shell
 
 IMAGE_NAME=v0_kbhonest
 
