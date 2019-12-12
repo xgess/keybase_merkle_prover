@@ -76,7 +76,7 @@
         },
         "pykeybasebot": {
             "git": "https://github.com/keybase/pykeybasebot.git",
-            "ref": "ed4f0189922c603ce5a2372ed26279f6fe1f9d67"
+            "ref": "dbcaf7131cd7fef6f0dac0f89d4d93b2f437f7b4"
         },
         "pysha3": {
             "hashes": [

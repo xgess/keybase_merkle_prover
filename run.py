@@ -4,6 +4,7 @@ import os
 import sys
 
 from pykeybasebot import Bot
+import pykeybasebot.types.chat1 as chat1
 
 from task import broadcast_new_root, update_messages
 
@@ -14,33 +15,50 @@ ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
 
 
 # setup the bot
-def noop_handler(*args, **kwargs):
-    pass
+
+async def handler(bot, event):
+    logging.debug(event)
+    if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
+        # not a basic chat message. bail.
+        return
+    if event.msg.sender.username == bot.username:
+        # my own message in the channel. bail.
+        return
+    channel = event.msg.channel
+    msg = f'{open("./response.txt").read()}'.format(**locals())
+    await bot.chat.send(channel, msg)
+
+listen_options = {"hide-exploding": False, "filter_channels": None}
 
 bot = Bot(
     username=os.environ["KEYBASE_USERNAME"],
     paperkey=os.environ["KEYBASE_PAPERKEY"],
-    handler=noop_handler,
+    handler=handler,
 )
 
-# loops for tasks
-async def post_new_roots():
+
+# loops for two-stage OTS proofs
+async def prove_new_root():
     while True:
         logging.debug("ready to broadcast a new root")
         await broadcast_new_root(bot)
         await asyncio.sleep(NEW_ROOT_INTERVAL)
 
-
-async def update_on_chain():
+async def update_with_btc_chain_data():
     while True:
-        logging.debug("ready to update some messages")
+        logging.debug("update messages | starting...")
         await update_messages(bot)
+        logging.debug("update messages | sleeping...")
         await asyncio.sleep(ON_CHAIN_UPDATE_INTERVAL)
 
 
 # start the runner
 async def do_it():
-  await asyncio.gather(post_new_roots(), update_on_chain())
+    await asyncio.gather(
+        bot.start(listen_options),
+        prove_new_root(),
+        update_with_btc_chain_data(),
+    )
 
 # run it!
 asyncio.run(do_it())

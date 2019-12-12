@@ -1,20 +1,36 @@
 import asyncio
+from base64 import b64decode, b64encode
+from dataclasses import dataclass, field
+from dataclasses_json import dataclass_json
+from enum import Enum
 import logging
 import json
-from binascii import hexlify
-import os
 import re
-from base64 import b64decode, b64encode
-import subprocess
-import shutil
+from typing import List
 
-from pykeybasebot import Bot
 import pykeybasebot.types.chat1 as chat1
 import requests
-from opentimestamps.core.timestamp import DetachedTimestampFile
+
+import kb_ots
 
 
-EXPECTED_MAGIC_BYTES = DetachedTimestampFile.HEADER_MAGIC
+class ProofStatus(Enum):
+    PRELIMINARY = "PRELIMINARY"
+    SUPERSEDED = "SUPERSEDED"
+    VERIFIABLE = "VERIFIABLE"
+
+
+@dataclass_json
+@dataclass
+class KeybaseMerkleProof:
+    seqno: int = 0
+    ctime_string: str = "1970-01-01T00:00:00.000Z"
+    kb_merkle_root: str = ""
+    kb_sig: str = ""
+    ots: str = ""
+    version: int = 0
+    status: ProofStatus = ProofStatus.PRELIMINARY
+    bitcoin_checks: List[str] = field(default_factory=lambda: [])
 
 
 async def broadcast_new_root(bot):
@@ -24,129 +40,75 @@ async def broadcast_new_root(bot):
 
     response = requests.get(url)
     res = response.json()
-    root_hash, seqno, ctime_string = res['hash'], res['seqno'], res['ctime_string']
+    kb_merkle_root, seqno, ctime_string = res['hash'], res['seqno'], res['ctime_string']
     sig = re.compile(r"\n\n((\S|\n)*?)\n=").search(res['sigs'][keybase_kid]['sig']).group(1)
-    sig = sig.replace('\n', '')  # throwaway newlines
+    sig = sig.replace('\n', '')
     sig_data = b64decode(sig)
 
-    result = subprocess.run(['ots', '-v', 'stamp'], input=sig_data, capture_output=True)
-    if result.returncode is not 0:
-        logging.error(f"STAMP returned something non-zero {result}")
+    try:
+        ots = await kb_ots.stamp(sig_data)
+    except kb_ots.StampError as e:
+        logging.error(e)
         return
 
-    if result.stdout[:len(EXPECTED_MAGIC_BYTES)] != EXPECTED_MAGIC_BYTES:
-        logging.error("STAMP magic bytes don't match:", result.stdout)
-        return
-
-    kbmsg = {
-        "version": 0,
-        "root_hash": root_hash,
-        "seqno": seqno,
-        "ctime_string": ctime_string,
-        "on_chain": False,
-        "sig_over_merkle_root": sig,
-        "ots_proof": b64encode(result.stdout).decode('UTF-8'),
-    }
-    await bot.chat.broadcast(json.dumps(kbmsg))
-
+    kb_proof = KeybaseMerkleProof(
+        seqno=seqno,
+        ctime_string=ctime_string,
+        kb_merkle_root=kb_merkle_root,
+        kb_sig=sig,
+        ots=ots,
+    )
+    res = await bot.chat.broadcast(kb_proof.to_json())
+    logging.info(f"broadcasted new root at msg_id {res.message_id}")
 
 
 async def update_messages(bot):
-    logging.debug("updating messages")
     channel = chat1.ChatChannel(name=bot.username, public=True)
-    all_posts = await bot.chat.read(channel)
-    for m in all_posts:
+    all_posts = await bot.chat.read(channel) # paginate this and only pull recents
+    for m in reversed(all_posts):
         try:
-            kbmsg = json.loads(m.content.text.body)
+            kb_proof = KeybaseMerkleProof.from_json(m.content.text.body)
             msg_id = m.id
         except:
-            logging.debug(f"couldn't parse message {m.id}. continuing...")
+            logging.debug(f"couldn't parse message {m.id}. nothing to do here...")
             continue
-        if kbmsg.get('version') != 0:
+        if kb_proof.version != 0:
+            logging.debug(f"message {m.id} has an old version. nothing to do here...")
             continue
-        if msg_id == 5:
-            continue
-        if kbmsg['on_chain'] is False:
-            await update_ots_for_msg(bot, msg_id, kbmsg)
+        logging.debug(f"message {m.id} has status {kb_proof.status}")
+        if kb_proof.status is ProofStatus.PRELIMINARY:
+            await update_ots_for_msg(bot, msg_id, kb_proof)
+            await asyncio.sleep(1)  # necessary for broadcasting to succeed :/
 
 
-async def update_ots_for_msg(bot, msg_id, kbmsg):
+async def update_ots_for_msg(bot, msg_id, kb_proof):
     logging.debug(f"msg {msg_id} is not yet on chain")
-    sig_data = b64decode(kbmsg['sig_over_merkle_root'])
-    ots_data = b64decode(kbmsg['ots_proof'])
+    sig_data = b64decode(kb_proof.kb_sig)
+    ots_data = b64decode(kb_proof.ots)
 
-    # set up some temp files because ots doesn't handle
-    # streams well for the `upgrade` command
-    tmpdir = f"./tmp"
-    data_path = os.path.join(tmpdir, str(msg_id))
-    ots_path = f"{data_path}.ots"
-    bak_path = f"{ots_path}.bak"
-    cleanup(data_path, ots_path, bak_path)
-
-    with open(data_path, 'wb') as f:
-        f.write(sig_data)
-    with open(ots_path, 'wb') as f:
-        f.write(ots_data)
-
-    result = subprocess.run(['ots', 'upgrade', ots_path], capture_output=True)
-    logging.debug(f"UPGRADE {result}")
-    if not_on_chain_yet(result):
-        logging.debug(f'UPGRADE proof for {msg_id} is not on chain yet')
-        cleanup(data_path, ots_path, bak_path)
-        return
-    if result.returncode != 0:
-        logging.error(f'unexpected returncode {result.returncode} when upgrading {msg_id}')
-        cleanup(data_path, ots_path, bak_path)
-        return
-
-    with open(ots_path, 'rb') as f:
-        upgraded_data = f.read()
-
-    if upgraded_data == ots_data:
-        # nothing actually changed. bail.
-        cleanup(data_path, ots_path, bak_path)
-        return
-
-    result = subprocess.run(
-        ['ots', '--no-cache', '--no-bitcoin', '-v', 'verify', ots_path]
-        , capture_output=True)
-    logging.debug(f"VERIFY {result}")
-    if not successfully_verified(result):
-        logging.debug(f'something went wrong verifying proof for {msg_id}')
-        result = subprocess.run(['ots', 'info', ots_path], capture_output=True)
-        logging.debug(f"INFO {result}")
-        logging.debug(f"ots data after upgrade: {upgraded_data}")
-        cleanup(data_path, ots_path, bak_path)
-        return
-
-    cleanup(data_path, ots_path, bak_path)
-
-    kbmsg['ots_proof'] = b64encode(upgraded_data).decode('UTF-8')
-    kbmsg['on_chain'] = True
-    kbmsg['btc_check'] = extract_verify_checks(result)
-    channel = chat1.ChatChannel(name=bot.username, public=True)
-    await bot.chat.edit(channel, msg_id, json.dumps(kbmsg))
-
-
-def cleanup(*args):
     try:
-        [ os.remove(f) for f in args ]
-    except FileNotFoundError:
-        pass
+        completed_ots, bitcoin_checks = await kb_ots.upgrade(
+            identifier=msg_id,
+            raw_data=sig_data,
+            ots_data=ots_data,
+        )
+    except (kb_ots.VerifyError, kb_ots.UpgradeError) as e:
+        logging.debug(e)
+        return
 
-def not_on_chain_yet(ots_upgrade_result):
-    pending_message = b"Pending confirmation in Bitcoin blockchain"
-    return pending_message in ots_upgrade_result.stdout
-
-def successfully_verified(ots_verify_result):
-    return (
-        b'Success! Timestamp complete' in ots_verify_result.stderr or
-        b'To verify manually, check that Bitcoin block' in ots_verify_result.stderr
+    superseded_kb_proof = KeybaseMerkleProof.replace(kb_proof,
+        status=ProofStatus.SUPERSEDED,
+        ots="",
+        kb_sig="",
     )
+    verifiable_kb_proof = KeybaseMerkleProof.replace(kb_proof,
+        status=ProofStatus.VERIFIABLE,
+        ots=completed_ots,
+        bitcoin_checks=bitcoin_checks,
+    )
+    channel = chat1.ChatChannel(name=bot.username, public=True)
 
-def extract_verify_checks(ots_verify_result):
-    # e.g. ['To verify manually, check that Bitcoin block 607429 has merkleroot 8ee50d75b...']
-    lines = ots_verify_result.stderr.decode('utf-8').split('\n')
-    relevant = [l for l in lines if l.startswith('To verify manually')]
-    return relevant
-
+    # broadcast the update and delete the previous message
+    logging.info(f"{msg_id} is ready to be updated")
+    await bot.chat.broadcast(verifiable_kb_proof.to_json())
+    await bot.chat.edit(channel, msg_id, superseded_kb_proof.to_json())

@@ -1,0 +1,30 @@
+*HIGH LEVEL: WHAT AM I DOING?*
+I'm an alternative implementation of Keybase's Bitcoin-anchored security model. Keybase publishes its global Merkle root into Bitcoin so any two users can be sure they're seeing all of the same user & device & team & keybaase-config related changes, all of which can be found in the Keybase Merkle tree. This is neat, but they only do it a couple times a day. With OpenTimestamps, I can make the same guarantee (admittedly a little more work to verify) much more often. And if multiple people ran me, there'd be an even greater guarantee that Keybase could not fork the state of the world without someone noticing.
+
+Instead of burning a small amount of Bitcoin to get some bytes directly on chain (which Keybase does every 12 hours), I'm using https://opentimestamps.org to create a proof (which is free to me, but you should go donate kthx), and I'm publishing Keybase's signature (over the Merkle root) along with this proof in my public channel, where I've signed it, and everyone can see it. 
+
+*DETAILS*
+You can see these proofs from the CLI in my public channel:
+```
+keybase chat read --public {bot.username}
+```
+They're JSON and hopefully self-explanatory. What's not totally obvious is that proofs happen in two stages:
+(1) fetch the current merkle root and signature from the Keybase API at https://keybase.io/_/api/1.0/merkle/root.json, then request an opentimestamp proof (`ots stamp`), and broadcast the preliminary ots proof with the raw Keybase data.
+(2) Once the proof has made its way via the opentimestamps protocol all the way to
+the blockchain, update the ots proof (`ots upgrade`) and then the full Keybase message JSON with the additional OTS data. The messages are too big for a simple `edit` of the keybase post, so I'm posting a new message and marking the previous one as `SUPERSEDED`.
+
+If you want to check my work or use these proofs, first of all, thanks :tada:. If you're going to use the `ots` CLI, you'll need to get the raw bytes (it's currently base64 encoded) from a couple of the fields into files in the same directory. If you have a Bitcoin node running locally, then it would look something like this:
+```
+> cat one_of_my_posts | jq -r .kb_sig | base64 --decode > ./kb_sig.dat
+> cat one_of_my_posts | jq -r .ots | base64 --decode > ./kb_sig.dat.ots
+> ots verify kb_sig.dat.ots
+```
+If you aren't running Bitcoin on this machine and you don't want to wire up an RPC connection, you could do this instead of the full `verify`:
+```
+> ots --no-bitcoin verify kb_sig.dat.ots
+> ots info kb_sig.dat.ots
+```
+And you'll see the Merkle path and block height.
+
+My code is open source. Or will be soon. Link to come. Probably also a bunch of little improvements. Suggestions welcome. Thanks for reading!
+

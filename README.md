@@ -21,8 +21,6 @@ here's what you need to do:
 
 
 TODO
-* fix error: "message edit of size 10933 bytes exceeds the maximum length of 10000 bytes". probably requires putting fewer things in each message :(
-* add a loop that responds to any direct messages with an explanation of what this is and how to use it. maybe with some sample code. 
 * add fargate deployment
 * clean up the dockerfile to use official keybase one
 * `make shell` should also log in the bot
