@@ -1,6 +1,6 @@
 import asyncio
 from base64 import b64decode, b64encode
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from dataclasses_json import dataclass_json
 from enum import Enum
 import logging
@@ -22,7 +22,7 @@ class StampStatus(Enum):
 @dataclass_json
 @dataclass
 class StampedMerkleRoot:
-    # this is what gets serialized into a broadcasted keybase chat msg
+    # this is the object that gets serialized into a broadcasted keybase chat msg
     root: MerkleRoot
     ots: str = ""  # base64 encoded string of the bytes in the `.ots` file
     version: int = 0
@@ -45,13 +45,14 @@ async def broadcast_new_root(bot):
         ots=ots,
         status=StampStatus.PRELIMINARY,
     )
-    # res = await bot.chat.broadcast(stamped_root.to_json())
-    # logging.info(f"broadcasted new root at msg_id {res.message_id}")
+    res = await bot.chat.broadcast(stamped_root.to_json())
+    logging.info(f"broadcasted new root at msg_id {res.message_id}")
 
 
 async def update_messages(bot):
     channel = chat1.ChatChannel(name=bot.username, public=True)
-    # TODO: paginate this intelligently
+    # TODO: paginate this more intelligently. I think Keybase will automatically
+    # give the most recent 100 messages, which is probably fine to be honest.
     all_posts = await bot.chat.read(channel)
     for m in reversed(all_posts):
         try:
@@ -83,11 +84,11 @@ async def update_ots_for_msg(bot, msg_id, stamped_root):
         logging.debug(e)
         return
 
-    superseded_stamp = StampedMerkleRoot.replace(stamped_root,
+    superseded_stamp = replace(stamped_root,
         status=StampStatus.SUPERSEDED,
         ots="",
     )
-    verifiable_stamp = StampedMerkleRoot.replace(stamped_root,
+    verifiable_stamp = replace(stamped_root,
         status=StampStatus.VERIFIABLE,
         ots=completed_ots,
         bitcoin_checks=bitcoin_checks,

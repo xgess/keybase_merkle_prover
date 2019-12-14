@@ -27,7 +27,7 @@ async def handler(bot, event):
         # my own message in the channel. bail.
         return
     channel = event.msg.channel
-    msg = f'{open("./response.txt").read()}'.format(**locals())
+    msg = f'{open("./chat_response.txt").read()}'.format(**locals())
     await bot.chat.send(channel, msg)
 
 listen_options = {"hide-exploding": False, "filter_channels": None}

@@ -2,9 +2,9 @@
 # Keybase-OpenTimestamps Merkle Root Prover
 
 ## What is this
-fun for me
+a fun (for me) combo of a few of my favorite things.
 * A dockerized, AWS-Fargate deployable, Python Keybase chat bot
-* Uses OpenTimestamps to create proofs so the Keybase servers cannot present different Merkle roots to different users (this would theoretically allow them to withhold information like Alice revoking a device). Keybase already does this (i.e. without OpenTimestamps), but I'm doing it in a different way with different tradeoffs.
+* Uses OpenTimestamps to create proofs so the Keybase servers cannot present different merkle roots to different users (this would theoretically allow them to withhold information like Alice revoking a device). Keybase already does this (i.e. without OpenTimestamps), but I'm doing it in a different way with different tradeoffs.
 * Publish these proofs right on Keybase using the bot's public channel (signed but not encrypted) so anyone can read them. 
 
 ## To whom is this useful
@@ -17,35 +17,38 @@ I really like that the Keybase security model includes pinning data to Bitcoin. 
 
 If my running bot is the only instance of anything posting these proofs, and if the Keybase servers know it's happening, then they could also withold these messages, which would admittedly defeat the purpose. On the other hand, if multiple people were running it, they would have a much harder time identifying all of them. Better yet, if you ran the bot inside a private team (i.e. all of the messages were sent to a channel that could only be read by team members), then the members of the team could check against the published proofs for their own private guarantee. 
 
-## the implementation
+## Implementation
 it's a dockerized python3.7 chatbot using [pykeybasebot](https://github.com/keybase/pykeybasebot). 
 1. it uses pipfile locally and vanilla pip inside docker
 2. username and paperkey for the bot are in env_file
 3. the bot responds to any chat messages with a really long description of what it's doing.
-4. i try to run everything through `make`. 
+4. i try to run everything through `make`, so if you're wondering how something works, I suggest starting there.
 
 ## setup
 *getting it running locally*:
 * install pipenv, e.g. `brew install pipenv`
-* make a keybase user and paperkey. you can do this through the CLI or GUI on some other device with keybase. you can also use a paperkey on your personal account to play around.
+* make a keybase user and paperkey. you can do this through the CLI or GUI on some other device with keybase. you can also use a paperkey from your personal account to play around.
 * update the env_file with your `KEYBASE_USERNAME` and `KEYBASE_PAPERKEY`.
 ```
 cp ./env_file.example ./env_file
 ```
-* If you're just using this as a skeleton, update `*.py` with your preferred logic.
+* If you're just using this as a skeleton, update `code/*.py` with your preferred logic.
 * `make run` to spin it up locally. to spin it down, `make kill`.
 * you can also run `make shell` to get a bash terminal inside the container with your keybase user logged in.
+* if you broadcasted a bunch of public messages and you're ready to wipe the slate clean, you can do that inside the docker container (i.e. after running `make shell`) by running `keybase chat delete-history $KEYBASE_USERNAME --public`
 
-*to deploy it to AWS*:
+*deploy it to AWS*:
 * install [fargate cli](https://somanymachines.com/fargate/)
-* go into your AWS console, find a security group and subnet, update `env_file`
-* `make setup` will create all the things you need in AWS
-* `make deploy` will push the artifacts and scale it up to 1 instance. 
+* go into your AWS console, find a security group and subnet (follow the docs for the fargate cli for what permissions these need), and update your `env_file`
+* `make setup` will create everything you need in AWS
+* `make deploy` will push the artifacts and scale it up to 1 running instance.
+
+
+## Related Links
+* [OpenTimestamps](https://github.com/opentimestamps/opentimestamps-client/blob/master/README.md)
+* [keybase merkle root basics](https://keybase.io/docs/server_security/our_merkle_key)
+* [keybase merkle root in bitcoin](https://keybase.io/docs/server_security/merkle_root_in_bitcoin_blockchain)
 
 
 ## TODO
 * i dunno. make a suggestion.
-
-## Related Links
-https://keybase.io/docs/server_security/merkle_root_in_bitcoin_blockchain
-https://keybase.io/docs/server_security/our_merkle_key
