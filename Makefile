@@ -2,7 +2,6 @@
 
 ENV_FILE_PATH=./env_file
 include $(ENV_FILE_PATH)
-IMAGE_NAME=v0kbhonest
 
 build:
 	pipenv lock --requirements > requirements.txt
@@ -34,7 +33,7 @@ deploy: build
 
 set_env: wipe_env
 	@fargate service env set $(SERVICE_NAME) --env KEYBASE_USERNAME=$(KEYBASE_USERNAME) > /dev/null
-	@fargate service env set $(SERVICE_NAME) --env KEYBASE_PAPERKEY=$(KEYBASE_PAPERKEY) > /dev/null
+	@fargate service env set $(SERVICE_NAME) --env KEYBASE_PAPERKEY="$(KEYBASE_PAPERKEY)" > /dev/null
 
 wipe_env:
 	@for env_var in `$(MAKE) list_deployed_env_vars`; do \

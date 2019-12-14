@@ -1,8 +1,11 @@
 # bot details
 KEYBASE_USERNAME=bot_username
-KEYBASE_PAPERKEY="correct horse battery staple"
+KEYBASE_PAPERKEY=correct horse battery staple
 
-# fargate deployment
+# for docker
+IMAGE_NAME=v0imageName
+
+# deployment to Fargate
 SERVICE_NAME=kbbotService
 SUBNET_ID=subnet-11111111
 SECURITY_GROUP_ID=sg-11111111
