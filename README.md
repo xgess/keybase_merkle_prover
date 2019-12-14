@@ -38,14 +38,11 @@ Be careful with setting environment variables in Fargate. I'm doing them right o
 
 
 ## TODO
-* add fargate deployment
-* squash and push to github
-* add a license
-* paginate the reading of messages so we aren't looking at every message every time
 * clean up the dockerfile to use official keybase one
 * `make shell` should also log in the bot
-* a note somewhere for adding environment variables
 * verify the sig over the root hash
+* squash and push to github
+* paginate the reading of messages so we aren't looking at every message every time
 https://keybase.io/docs/server_security/merkle_root_in_bitcoin_blockchain
 https://keybase.io/docs/server_security/our_merkle_key
 
