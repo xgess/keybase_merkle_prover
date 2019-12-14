@@ -11,7 +11,7 @@ from task import broadcast_new_root, update_messages
 
 logging.basicConfig(level=logging.DEBUG)
 NEW_ROOT_INTERVAL = 60 * 60  # every hour
-ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
+ON_CHAIN_UPDATE_INTERVAL = 7 #1 * 60  # every 1 minute
 
 
 ################################
@@ -45,13 +45,13 @@ bot = Bot(
 async def new_proof_loop():
     while True:
         logging.debug("ready to broadcast a new root")
-        # await broadcast_new_root(bot)
+        await broadcast_new_root(bot)
         await asyncio.sleep(NEW_ROOT_INTERVAL)
 
 async def update_proof_loop():
     while True:
         logging.debug("update messages | starting...")
-        # await update_messages(bot)
+        await update_messages(bot)
         logging.debug("update messages | sleeping...")
         await asyncio.sleep(ON_CHAIN_UPDATE_INTERVAL)
 

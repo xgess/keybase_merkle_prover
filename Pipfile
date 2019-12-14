@@ -14,3 +14,4 @@ pykeybasebot = {ref = "xgess/add-public-broadcast",git = "https://github.com/key
 requests = "*"
 opentimestamps = "*"
 opentimestamps-client = "*"
+pgpy = "*"

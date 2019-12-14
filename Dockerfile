@@ -22,6 +22,7 @@ RUN chown keybase /app
 COPY requirements.txt /app
 RUN pip3 install -r requirements.txt
 COPY . /app
+RUN chown keybase ./tmp
 
 # Tell the keybase entrypoint to start a running service. It will
 # use KEYBASE_USERNAME and KEYBASE_PAPERKEY from the environment.
