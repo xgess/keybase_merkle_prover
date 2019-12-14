@@ -14,6 +14,8 @@ NEW_ROOT_INTERVAL = 60 * 60  # every hour
 ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
 
 
+################################
+
 # setup the bot
 
 async def handler(bot, event):
@@ -36,29 +38,31 @@ bot = Bot(
     handler=handler,
 )
 
+################################
 
 # loops for two-stage OTS proofs
-async def prove_new_root():
+
+async def new_proof_loop():
     while True:
         logging.debug("ready to broadcast a new root")
-        await broadcast_new_root(bot)
+        # await broadcast_new_root(bot)
         await asyncio.sleep(NEW_ROOT_INTERVAL)
 
-async def update_with_btc_chain_data():
+async def update_proof_loop():
     while True:
         logging.debug("update messages | starting...")
-        await update_messages(bot)
+        # await update_messages(bot)
         logging.debug("update messages | sleeping...")
         await asyncio.sleep(ON_CHAIN_UPDATE_INTERVAL)
 
+################################
 
-# start the runner
+# run everything
 async def do_it():
     await asyncio.gather(
         bot.start(listen_options),
-        prove_new_root(),
-        update_with_btc_chain_data(),
+        new_proof_loop(),
+        update_proof_loop(),
     )
 
-# run it!
 asyncio.run(do_it())
