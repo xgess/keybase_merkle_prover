@@ -33,7 +33,7 @@ async def stamp(raw_data):
 async def upgrade(identifier, raw_data, ots_data):
     # set up temp files because ots doesn't handle
     # streams well for the `upgrade` command
-    tmpdir = f"./tmp"
+    tmpdir = f"../tmp"
     data_path = os.path.join(tmpdir, str(identifier))
     ots_path = f"{data_path}.ots"
     bak_path = f"{ots_path}.bak"

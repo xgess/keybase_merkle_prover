@@ -11,7 +11,7 @@ from task import broadcast_new_root, update_messages
 
 logging.basicConfig(level=logging.DEBUG)
 NEW_ROOT_INTERVAL = 60 * 60  # every hour
-ON_CHAIN_UPDATE_INTERVAL = 7 #1 * 60  # every 1 minute
+ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
 
 
 ################################

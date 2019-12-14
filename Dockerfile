@@ -28,4 +28,4 @@ RUN chown keybase ./tmp
 # use KEYBASE_USERNAME and KEYBASE_PAPERKEY from the environment.
 ENV KEYBASE_SERVICE 1
 
-CMD ["python3", "/app/run.py"]
+CMD ["python3", "/app/code/main.py"]

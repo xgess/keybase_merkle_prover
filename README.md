@@ -44,7 +44,6 @@ cp ./env_file.example ./env_file
 
 
 ## TODO
-* do some file/folder cleanup
 * squash and push to github
 * paginate the reading of messages so we aren't looking at every message every time though keybase may just do this for us automagically.
 https://keybase.io/docs/server_security/merkle_root_in_bitcoin_blockchain
