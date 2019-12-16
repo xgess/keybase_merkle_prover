@@ -100,13 +100,17 @@ async def update_ots_for_msg(logger, bot, msg_id, stamped_root):
     ots_data = b64decode(stamped_root.ots)
 
     try:
-        completed_ots = await kb_ots.upgrade(
+        completed_ots, is_final = await kb_ots.upgrade(
             identifier=msg_id,
             raw_data=stamped_root.root.data_to_stamp,
             ots_data=ots_data,
         )
     except (kb_ots.VerifyError, kb_ots.UpgradeError) as e:
-        logger.info(f"message {msg_id} is not yet ready: {e}")
+        logger.info(f"message {msg_id} failed to verify: {e}")
+        return
+
+    if not is_final:
+        logger.info(f"message {msg_id} is not yet on chain")
         return
 
     verifiable_stamp = replace(stamped_root,

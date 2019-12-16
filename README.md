@@ -15,7 +15,9 @@ a fun (for me) combo of a few of my favorite things.
 
 
 ## Why
-I really like that the Keybase security model includes pinning data to Bitcoin. It's an elegant solution to a very specific security issue (what if the Keybase servers collude with, for example, someone who has stolen your recently revoked device) that makes for a compelling, non-monetary use of the blockchain. Timestamping in general is interesting, but anchoring the security of an application platform to guarantee no one is missing any updates they need is just :chef-kiss:. 
+I really like that the Keybase security model includes pinning data to Bitcoin. It's an elegant solution to a very specific security issue (what if the Keybase servers collude with, for example, someone who has stolen your recently revoked device) that makes for a compelling, non-monetary use of the blockchain. Timestamping in general is interesting, but anchoring the security of an application platform to guarantee no one is missing any updates they need is just 
+![chef kiss](https://is1-ssl.mzstatic.com/image/thumb/Purple128/v4/81/08/9e/81089ec4-c468-ace0-02bb-01c65e753c89/source/512x512bb.jpg)
+
 
 If my running bot is the only instance of anything posting these proofs, and if the Keybase servers know it's happening, then they could just withhold these messages from you, which would admittedly defeat the purpose. On the other hand, if multiple people were running it, they would have a harder time identifying all of them. Better yet, if you ran the bot inside a private team (i.e. all of the messages were sent to a channel that could only be read by team members), then the members of the team could check against the published proofs for their own private guarantee. 
 
@@ -78,8 +80,8 @@ If you're going to use the `ots` CLI to see those proofs in action, first of all
 ```
 If you aren't running Bitcoin on this machine and you don't want to wire up an RPC connection, you could do this instead of the full `verify`:
 ```
-> ots --no-bitcoin verify kb_sig.dat.ots
-> ots info kb_sig.dat.ots
+> ots --no-bitcoin verify sig_hash.dat.ots
+> ots info sig_hash.dat.ots
 ```
 And you'll see the Merkle path and block height.
 
@@ -91,5 +93,4 @@ And you'll see the Merkle path and block height.
 
 
 ## TODO
-* have my ots wrapper not raise an exception when it's just that it hasn't been verified yet on chain
 * i dunno. make a suggestion.
