@@ -1,6 +1,9 @@
 from base64 import b64decode, b64encode
+from contextlib import redirect_stderr
 from dataclasses_json import dataclass_json
 from dataclasses import dataclass
+import hashlib
+import io
 import json
 import logging
 import re
@@ -10,6 +13,7 @@ import requests
 
 
 KEYBASE_MERKLE_ROOT_URL = 'https://keybase.io/_/api/1.0/merkle/root.json'
+TEMPLATE_MERKLE_URL = KEYBASE_MERKLE_ROOT_URL + "?seqno={seqno}"
 KEYBASE_KID = '010159baae6c7d43c66adf8fb7bb2b8b4cbe408c062cfc369e693ccb18f85631dbcd0a'
 
 
@@ -23,39 +27,35 @@ class MerkleRoot:
     # if the format of anything in here changes, make sure to
     # bump the version of StampedMerkleRoot
     seqno: int = 0
-    root_hash: str = "0" * 128
     ctime_string: str = "1970-01-01T00:00:00.000Z"
-    b64sig: str = ""
-
-    @property
-    def url(self):
-        return f"https://keybase.io/_/api/1.0/merkle/root.json?seqno={self.seqno}"
+    root_hash: str = 128 * "0"
+    b64stamped: str = 128 * "0"  # hash of validated sig over merkle root payload
+    stable_url: str = TEMPLATE_MERKLE_URL.format(seqno=0)
 
     @property
     def data_to_stamp(self) -> bytes:
-        return b64decode(self.b64sig)
+        return b64decode(self.b64stamped)
 
 
-# fetch from the keybase API and verify against their PGP key
+# fetch from the keybase API and verify a bunch of things
 def fetch_keybase_merkle_root() -> MerkleRoot:
     # fetch the current merkle root from the keybase api
     resp = requests.get(KEYBASE_MERKLE_ROOT_URL)
     full_kb_merkle_root = resp.json()
+    seqno = full_kb_merkle_root['seqno']
+    stable_url = TEMPLATE_MERKLE_URL.format(seqno=seqno)
+    root_hash = full_kb_merkle_root['hash']
 
-    # extract the signature and signed payload into a PGP message
+    # extract the signature and signed payload into a PGP message for verification
     raw_pgp_sig_msg = full_kb_merkle_root['sigs'][KEYBASE_KID]['sig']
 
-    # see https://keybase.io/docs/server_security/merkle_root_in_bitcoin_blockchain
-    # trim away checksum and framing for just the raw bytes need
-    trimmed_sig = re.compile(r"\n\n((\S|\n)*?)\n=").search(raw_pgp_sig_msg).group(1).replace('\n', '')
-    merkle_root = MerkleRoot(
-        seqno=full_kb_merkle_root['seqno'],
-        root_hash=full_kb_merkle_root['hash'],
-        ctime_string=full_kb_merkle_root['ctime_string'],
-        b64sig=b64encode(trimmed_sig.encode()).decode('utf-8'),
-    )
+    # the message itself is too big to include with OTS data in a chat message
+    # so let's take the hash of it and use that instead. this is kind of a
+    # bummer because it's almost OK to use the whole thing.
+    hash_of_raw_pgp_sig = hashlib.sha512(raw_pgp_sig_msg.encode()).digest()
+    b64stamped = b64encode(hash_of_raw_pgp_sig).decode('utf-8')
 
-    # verify the pgp message against keybase's public key
+    # this function will raise an exception if PGP verification fails
     signed_payload = _verify_keybase_signature(raw_pgp_sig_msg)
 
     # as a sanity check, ensure that the signed payload matches
@@ -65,9 +65,22 @@ def fetch_keybase_merkle_root() -> MerkleRoot:
     if signed_payload != claimed_payload:
         logging.error(f"signed_payload: {signed_payload}")
         logging.error(f"api response payload: {claimed_payload}")
-        raise VerificationError(f"signed payload doesn't match API response payload at {merkle_root.url}")
+        raise VerificationError(f"signed payload doesn't match API response payload at {stable_url}")
 
-    return merkle_root
+    # and most importantly, that the root hash that was signed is the same as the one that's
+    # at the top level of the API response body.
+    signed_root_hash = signed_payload['body']['root']
+    if (signed_root_hash != root_hash or len(signed_root_hash) == 0):
+        logging.error(f"signed_payload: {signed_payload}")
+        raise VerificationError(f"keybase signed a different root hash ({signed_root_hash}) from the one in the payload {root_hash}")
+
+    return MerkleRoot(
+        seqno=seqno,
+        root_hash=root_hash,
+        ctime_string=full_kb_merkle_root['ctime_string'],
+        b64stamped=b64stamped,
+        stable_url=stable_url,
+    )
 
 
 def _verify_keybase_signature(raw_pgp_sig_msg):
@@ -78,7 +91,10 @@ def _verify_keybase_signature(raw_pgp_sig_msg):
     kb_public_key, _ = PGPKey.from_blob(KEYBASE_PGP_VERIFICATION_KEY)
 
     # verify it: https://pgpy.readthedocs.io/en/latest/examples.html#verifying-things
-    verification_result = kb_public_key.verify(pgp_msg)
+    f = io.StringIO()
+    with redirect_stderr(f):
+        # suppress unnecessary stdout
+        verification_result = kb_public_key.verify(pgp_msg)
     if not verification_result:
         raise VerificationError("API response did not verify with Keybase's public key")
 

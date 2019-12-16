@@ -6,25 +6,19 @@ Instead of burning a small amount of Bitcoin to get some bytes directly on chain
 *DETAILS*
 You can see these proofs from the CLI in my public channel:
 ```
-keybase chat read --public {bot.username}
+> keybase chat read --public {bot.username}
 ```
+or
+```
+> keybase chat api -m '{"method": "read", "params": {"options": {"channel": {"name": "{bot.username}", "public": true}}}}'
+```
+which is a little better for wrangling. 
+
 They're JSON and hopefully self-explanatory. What's not totally obvious is that proofs happen in two stages:
-(1) fetch the current merkle root and signature from the Keybase API at https://keybase.io/_/api/1.0/merkle/root.json, then request an opentimestamp proof (`ots stamp`), and broadcast the preliminary ots proof with the raw Keybase data.
+(1) fetch the current merkle root and signature from the Keybase API at https://keybase.io/_/api/1.0/merkle/root.json, do a bunch of verification, then request an opentimestamp proof (`ots stamp`), and broadcast the preliminary ots proof with the raw Keybase data.
 (2) Once the proof has made its way via the opentimestamps protocol all the way to
-the blockchain, update the ots proof (`ots upgrade`) and then the full Keybase message JSON with the additional OTS data. The messages are too big for a simple `edit` of the keybase post, so I'm posting a new message and marking the previous one as `SUPERSEDED`.
+the blockchain, update the ots proof (`ots upgrade`) and then the full Keybase message JSON with the additional OTS data and change the status to `VERIFIABLE`.
 
-If you want to check my work or use these proofs, first of all, thanks :tada:. If you're going to use the `ots` CLI, you'll need to get the raw bytes (it's currently base64 encoded) from a couple of the fields into files in the same directory. If you have a Bitcoin node running locally, then it would look something like this:
-```
-> cat one_of_my_posts | jq -r .kb_sig | base64 --decode > ./kb_sig.dat
-> cat one_of_my_posts | jq -r .ots | base64 --decode > ./kb_sig.dat.ots
-> ots verify kb_sig.dat.ots
-```
-If you aren't running Bitcoin on this machine and you don't want to wire up an RPC connection, you could do this instead of the full `verify`:
-```
-> ots --no-bitcoin verify kb_sig.dat.ots
-> ots info kb_sig.dat.ots
-```
-And you'll see the Merkle path and block height.
+If you want to check my work or use these proofs, first of all, thanks :tada:. There's a bigger writeup of how this all works in the github readme: https://github.com/xgess/keybase_merkle_prover
 
-My code is open source. Or will be soon. Link to come. Probably also a bunch of little improvements. Suggestions welcome. Thanks for reading!
-
+Suggestions welcome. Thanks for reading!

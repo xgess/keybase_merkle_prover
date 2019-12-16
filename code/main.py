@@ -6,6 +6,8 @@ import sys
 from pykeybasebot import Bot
 import pykeybasebot.types.chat1 as chat1
 
+import last_success
+from merkle_root import KEYBASE_MERKLE_ROOT_URL
 from task import broadcast_new_root, update_messages
 
 
@@ -19,7 +21,6 @@ ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
 # setup the bot
 
 async def handler(bot, event):
-    logging.debug(event)
     if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
         # not a basic chat message. bail.
         return
@@ -27,7 +28,12 @@ async def handler(bot, event):
         # my own message in the channel. bail.
         return
     channel = event.msg.channel
-    msg = f'{open("./chat_response.txt").read()}'.format(**locals())
+    path = os.path.join(os.path.dirname(__file__), 'chat_response.txt')
+    msg = f'{open(path).read()}'.format(**locals())
+    await bot.chat.send(channel, msg)
+
+    seqno = await last_success.fetch(bot)
+    msg = f"And the last merkle root i've verified is this one: {KEYBASE_MERKLE_ROOT_URL}?seqno={seqno}"
     await bot.chat.send(channel, msg)
 
 listen_options = {"hide-exploding": False, "filter_channels": None}

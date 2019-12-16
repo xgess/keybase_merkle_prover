@@ -76,15 +76,15 @@ async def _upgrade(identifier, data_path, ots_path):
         , capture_output=True)
     logging.debug(f"VERIFY {result}")
     if not successfully_verified(result):
-        logging.debug(f'something went wrong verifying proof for {identifier}')
-        result = subprocess.run(['ots', 'info', ots_path], capture_output=True)
-        logging.debug(f"INFO {result}")
-        logging.debug(f"ots data after upgrade: {upgraded_data}")
+        logging.debug(f'{identifier} did not verify')
+        # uncomment these lines if something is broken. otherwise, it's spammy.
+        # result = subprocess.run(['ots', 'info', ots_path], capture_output=True)
+        # logging.debug(f"INFO {result}")
+        # logging.debug(f"ots data after upgrade: {upgraded_data}")
         raise VerifyError()
 
     ots = b64encode(upgraded_data).decode('UTF-8')
-    bitcoin_checks = extract_verify_checks(result)
-    return ots, bitcoin_checks
+    return ots
 
 
 def safe_delete(path):
@@ -102,12 +102,3 @@ def successfully_verified(ots_verify_result):
         b'Success! Timestamp complete' in ots_verify_result.stderr or
         b'To verify manually, check that Bitcoin block' in ots_verify_result.stderr
     )
-
-def extract_verify_checks(ots_verify_result):
-    # e.g. ['To verify manually, check that Bitcoin block 607429 has merkleroot 8ee50d75b...']
-    lines = ots_verify_result.stderr.decode('utf-8').split('\n')
-    relevant = [l for l in lines if l.startswith('To verify manually')]
-    return relevant
-
-
-
