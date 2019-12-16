@@ -15,6 +15,7 @@ import requests
 KEYBASE_MERKLE_ROOT_URL = 'https://keybase.io/_/api/1.0/merkle/root.json'
 TEMPLATE_MERKLE_URL = KEYBASE_MERKLE_ROOT_URL + "?seqno={seqno}"
 KEYBASE_KID = '010159baae6c7d43c66adf8fb7bb2b8b4cbe408c062cfc369e693ccb18f85631dbcd0a'
+logger = logging.getLogger(__name__)
 
 
 class VerificationError(Exception):
@@ -63,15 +64,15 @@ def fetch_keybase_merkle_root() -> MerkleRoot:
     # API response
     claimed_payload = json.loads(full_kb_merkle_root['payload_json'])
     if signed_payload != claimed_payload:
-        logging.error(f"signed_payload: {signed_payload}")
-        logging.error(f"api response payload: {claimed_payload}")
+        logger.error(f"signed_payload: {signed_payload}")
+        logger.error(f"api response payload: {claimed_payload}")
         raise VerificationError(f"signed payload doesn't match API response payload at {stable_url}")
 
     # and most importantly, that the root hash that was signed is the same as the one that's
     # at the top level of the API response body.
     signed_root_hash = signed_payload['body']['root']
     if (signed_root_hash != root_hash or len(signed_root_hash) == 0):
-        logging.error(f"signed_payload: {signed_payload}")
+        logger.error(f"signed_payload: {signed_payload}")
         raise VerificationError(f"keybase signed a different root hash ({signed_root_hash}) from the one in the payload {root_hash}")
 
     return MerkleRoot(
@@ -100,7 +101,7 @@ def _verify_keybase_signature(raw_pgp_sig_msg):
 
     good_signatures = list(verification_result.good_signatures)
     if len(good_signatures) != 1:
-        logging.error(f"good_signatures = {good_signatures}")
+        logger.error(f"good_signatures = {good_signatures}")
         raise VerificationError(f"Expected 1 valid signature, got {len(good_signatures)} from {specific_url}")
 
     return json.loads(good_signatures[0].subject)

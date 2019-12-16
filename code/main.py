@@ -11,9 +11,12 @@ from merkle_root import KEYBASE_MERKLE_ROOT_URL
 from task import broadcast_new_root, update_messages
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s | %(levelname)s | %(name)s -- %(message)s',
+)
 NEW_ROOT_INTERVAL = 60 * 60  # every hour
-ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
+ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every minute
 
 
 ################################
@@ -21,6 +24,7 @@ ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every 1 minute
 # setup the bot
 
 async def handler(bot, event):
+    logger = logging.getLogger('bot_handler')
     if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
         # not a basic chat message. bail.
         return
@@ -35,6 +39,7 @@ async def handler(bot, event):
     seqno = await last_success.fetch(bot)
     msg = f"And the last merkle root i've verified is this one: {KEYBASE_MERKLE_ROOT_URL}?seqno={seqno}"
     await bot.chat.send(channel, msg)
+    logger.debug(f"sent a response message in {channel.name}")
 
 listen_options = {"hide-exploding": False, "filter_channels": None}
 
@@ -49,16 +54,18 @@ bot = Bot(
 # loops for two-stage OTS proofs
 
 async def new_proof_loop():
+    logger = logging.getLogger('new_proof')
     while True:
-        logging.debug("ready to broadcast a new root")
-        await broadcast_new_root(bot)
+        logger.debug("ready to broadcast a new root")
+        await broadcast_new_root(logger, bot)
         await asyncio.sleep(NEW_ROOT_INTERVAL)
 
 async def update_proof_loop():
+    logger = logging.getLogger('update_proof')
     while True:
-        logging.debug("update messages | starting...")
-        await update_messages(bot)
-        logging.debug("update messages | sleeping...")
+        logger.debug("+ loop starting")
+        await update_messages(logger, bot)
+        logger.debug(f"- loop complete - sleeping {ON_CHAIN_UPDATE_INTERVAL} seconds")
         await asyncio.sleep(ON_CHAIN_UPDATE_INTERVAL)
 
 ################################

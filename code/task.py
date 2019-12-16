@@ -29,13 +29,13 @@ class StampedMerkleRoot:
     status: StampStatus = StampStatus.PRELIMINARY
 
 
-async def broadcast_new_root(bot):
-    logging.debug("broadcasting a new root")
+async def broadcast_new_root(logger, bot):
     merkle_root = fetch_keybase_merkle_root()
+    logger.debug(f"fetched and validated {merkle_root.seqno}")
     try:
         ots = await kb_ots.stamp(merkle_root.data_to_stamp)
     except kb_ots.StampError as e:
-        logging.error(e)
+        logger.error(f"error stamping {merkle_root.seqno}: {e}")
         return
 
     stamped_root = StampedMerkleRoot(
@@ -46,16 +46,16 @@ async def broadcast_new_root(bot):
     )
 
     my_public_channel = chat1.ChatChannel(name=bot.username, public=True)
-    res = await retry_if_timeout(bot.chat.send, my_public_channel, stamped_root.to_json())
-    logging.info(f"broadcasted new root at msg_id {res.message_id}")
+    res = await retry_if_timeout(logger, bot.chat.send, my_public_channel, stamped_root.to_json())
+    logger.info(f"broadcasted {merkle_root.seqno} at msg_id {res.message_id}")
 
 
-async def retry_if_timeout(func, *args, **kwargs):
+async def retry_if_timeout(logger, func, *args, **kwargs):
     for i in range(0,100):
         try:
             result = await func(*args, **kwargs)
         except asyncio.TimeoutError:
-            logging.error(f"got a timeout error on attempt {i+1}. retrying...")
+            logger.error(f"got a timeout error on attempt {i+1}. retrying...")
             await asyncio.sleep(0.5)
             continue
         break
@@ -64,29 +64,39 @@ async def retry_if_timeout(func, *args, **kwargs):
     return result
 
 
-async def update_messages(bot):
+async def update_messages(logger, bot):
     channel = chat1.ChatChannel(name=bot.username, public=True)
     # TODO: paginate this more intelligently. I think Keybase will automatically
     # give the most recent 100 messages, which is probably fine to be honest.
-    all_posts = await retry_if_timeout(bot.chat.read, channel)
+    all_posts = await retry_if_timeout(logger, bot.chat.read, channel)
     for m in reversed(all_posts):
+        msg_id = m.id
+        body = ""
         try:
-            stamped_root = StampedMerkleRoot.from_json(m.content.text.body)
-            msg_id = m.id
-        except Exception:
-            logging.debug(f"couldn't parse message {m.id}. nothing to do here...")
+            content_type = m.content.type_name
+            if content_type not in ('edit', 'text'):
+                # e.g. a `deletehistory`
+                logger.debug(f"message {msg_id} is a {content_type} - skip")
+                continue
+            stamped_root = StampedMerkleRoot.from_json((m.content.text or m.content.edit).body)
+        except Exception as e:
+            # any errors in here we should probably fix
+            logger.error(f"message {msg_id} doesn't parse as a stamped root ({e}) - skip - {m}")
             continue
         if stamped_root.version != 0:
-            logging.debug(f"message {m.id} has an old version. nothing to do here...")
+            logger.debug(f"message {msg_id} has an old version - skip")
             continue
-        logging.debug(f"message {m.id} has status {stamped_root.status}")
-        if stamped_root.status is StampStatus.PRELIMINARY:
-            await update_ots_for_msg(bot, msg_id, stamped_root)
+        if stamped_root.status is StampStatus.VERIFIABLE:
+            logger.debug(f"message {msg_id} is already verifiable - skip")
+        elif stamped_root.status is StampStatus.PRELIMINARY:
+            await update_ots_for_msg(logger, bot, msg_id, stamped_root)
             await asyncio.sleep(1)  # necessary for broadcasting to succeed :/
+        else:
+            logger.error(f"message {m.id} does not have a valid status: {stamped_root}")
 
 
-async def update_ots_for_msg(bot, msg_id, stamped_root):
-    logging.debug(f"msg {msg_id} is not yet on chain")
+async def update_ots_for_msg(logger, bot, msg_id, stamped_root):
+    seqno = stamped_root.root.seqno
     ots_data = b64decode(stamped_root.ots)
 
     try:
@@ -96,8 +106,7 @@ async def update_ots_for_msg(bot, msg_id, stamped_root):
             ots_data=ots_data,
         )
     except (kb_ots.VerifyError, kb_ots.UpgradeError) as e:
-        logging.info(f"{msg_id} is not yet ready: {e}")
-        logging.debug(e)
+        logger.info(f"message {msg_id} is not yet ready: {e}")
         return
 
     verifiable_stamp = replace(stamped_root,
@@ -109,9 +118,9 @@ async def update_ots_for_msg(bot, msg_id, stamped_root):
     # edit the message with the new deets
     seqno = verifiable_stamp.root.seqno
     try:
-        res = await retry_if_timeout(bot.chat.edit, channel, msg_id, verifiable_stamp.to_json())
+        res = await retry_if_timeout(logger, bot.chat.edit, channel, msg_id, verifiable_stamp.to_json())
     except Exception as e:
-        logging.error(f"got an error broadcasting verifiable stamp at seqno: {seqno}, msg_id: {msg_id}")
+        logger.error(f"message {msg_id} error broadcasting verifiable stamp: {e}")
         raise
-    logging.info(f"{msg_id} is now verifiable")
+    logger.info(f"message {msg_id} is now verifiable")
     await last_success.update(bot, seqno)

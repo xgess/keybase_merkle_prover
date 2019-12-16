@@ -7,6 +7,7 @@ from opentimestamps.core.timestamp import DetachedTimestampFile
 
 
 EXPECTED_MAGIC_BYTES = DetachedTimestampFile.HEADER_MAGIC
+logger = logging.getLogger(__name__)
 
 
 class StampError(Exception):
@@ -44,7 +45,7 @@ async def upgrade(identifier, raw_data, ots_data):
         with open(ots_path, 'wb') as f:
             f.write(ots_data)
 
-        return await _upgrade(identifier, data_path, ots_path)
+        return await _upgrade(logger, identifier, data_path, ots_path)
 
     finally:
         safe_delete(data_path)
@@ -52,35 +53,35 @@ async def upgrade(identifier, raw_data, ots_data):
         safe_delete(ots_path)
 
 
-async def _upgrade(identifier, data_path, ots_path):
+async def _upgrade(logger, identifier, data_path, ots_path):
     with open(ots_path, 'rb') as f:
         original_ots_data = f.read()
 
     result = subprocess.run(['ots', 'upgrade', ots_path], capture_output=True)
-    logging.debug(f"UPGRADE {result}")
     if not_on_chain_yet(result):
-        raise UpgradeError(f'UPGRADE proof for {identifier} is not on chain yet')
+        raise UpgradeError(f'{identifier} is not on chain yet')
     if result.returncode != 0:
-        raise UpgradeError(f'unexpected returncode {result.returncode} when upgrading {identifier}')
+        raise UpgradeError(f'unexpected return code {result.returncode}')
 
+    logger.debug(f"ots upgrade result for {identifier}: {result}")
     with open(ots_path, 'rb') as f:
         upgraded_data = f.read()
 
     if upgraded_data == original_ots_data:
-        logging.debug(f"{identifier} ots data didn't change. bail. ")
+        logger.debug(f"{identifier} ots data didn't change. bail. ")
         # nothing actually changed. bail.
         return
 
     result = subprocess.run(
         ['ots', '--no-cache', '--no-bitcoin', '-v', 'verify', ots_path]
         , capture_output=True)
-    logging.debug(f"VERIFY {result}")
+    logger.debug(f"ots verify result for {identifier}: {result}")
     if not successfully_verified(result):
-        logging.debug(f'{identifier} did not verify')
+        logger.debug(f'{identifier} did not verify')
         # uncomment these lines if something is broken. otherwise, it's spammy.
         # result = subprocess.run(['ots', 'info', ots_path], capture_output=True)
-        # logging.debug(f"INFO {result}")
-        # logging.debug(f"ots data after upgrade: {upgraded_data}")
+        # logger.debug(f"INFO {result}")
+        # logger.debug(f"ots data after upgrade: {upgraded_data}")
         raise VerifyError()
 
     ots = b64encode(upgraded_data).decode('UTF-8')
@@ -95,7 +96,7 @@ def safe_delete(path):
 
 def not_on_chain_yet(ots_upgrade_result):
     pending_message = b"Pending confirmation in Bitcoin blockchain"
-    return pending_message in ots_upgrade_result.stdout
+    return pending_message in ots_upgrade_result.stderr
 
 def successfully_verified(ots_verify_result):
     return (

@@ -91,4 +91,5 @@ And you'll see the Merkle path and block height.
 
 
 ## TODO
+* have my ots wrapper not raise an exception when it's just that it hasn't been verified yet on chain
 * i dunno. make a suggestion.
