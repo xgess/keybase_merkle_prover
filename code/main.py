@@ -15,7 +15,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s | %(levelname)s | %(name)s -- %(message)s',
 )
-NEW_ROOT_INTERVAL = 60 * 60  # every hour
+NEW_ROOT_INTERVAL = 20 * 60  # every 20 minutes
 ON_CHAIN_UPDATE_INTERVAL = 1 * 60  # every minute
 
 
