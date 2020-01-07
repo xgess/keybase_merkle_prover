@@ -14,6 +14,12 @@ import last_success
 from merkle_root import fetch_keybase_merkle_root, MerkleRoot
 
 
+# how many historical messages to read at a time
+# if there is a preliminary post further back than this, we
+# will never see it to verify it.
+MESSAGES_TO_CHECK = 30
+
+
 class StampStatus(Enum):
     PRELIMINARY = "PRELIMINARY"
     VERIFIABLE = "VERIFIABLE"
@@ -46,12 +52,16 @@ async def broadcast_new_root(logger, bot):
     )
 
     my_public_channel = chat1.ChatChannel(name=bot.username, public=True)
-    res = await retry_if_timeout(logger, bot.chat.send, my_public_channel, stamped_root.to_json())
+    try:
+        res = await retry_if_timeout(logger, bot.chat.send, my_public_channel, stamped_root.to_json())
+    except Exception as e:
+        logger.error(f"error broadcasting preliminary stamp: {e}")
+        raise
     logger.info(f"broadcasted {merkle_root.seqno} at msg_id {res.message_id}")
 
 
 async def retry_if_timeout(logger, func, *args, **kwargs):
-    for i in range(0,100):
+    for i in range(0, 100):
         try:
             result = await func(*args, **kwargs)
         except asyncio.TimeoutError:
@@ -66,9 +76,8 @@ async def retry_if_timeout(logger, func, *args, **kwargs):
 
 async def update_messages(logger, bot):
     channel = chat1.ChatChannel(name=bot.username, public=True)
-    # TODO: paginate this more intelligently. I think Keybase will automatically
-    # give the most recent 100 messages, which is probably fine to be honest.
-    all_posts = await retry_if_timeout(logger, bot.chat.read, channel)
+    pagination = chat1.Pagination(num=MESSAGES_TO_CHECK)
+    all_posts = await retry_if_timeout(logger, bot.chat.read, channel=channel, pagination=pagination)
     for m in reversed(all_posts):
         msg_id = m.id
         body = ""
