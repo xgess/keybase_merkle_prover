@@ -7,7 +7,6 @@ from pykeybasebot import Bot
 
 from interactivity import new_bot, start_bot
 import last_success
-from merkle_root import KEYBASE_MERKLE_ROOT_URL
 from task import broadcast_new_root, update_messages
 
 

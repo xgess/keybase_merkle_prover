@@ -160,7 +160,7 @@
         },
         "pykeybasebot": {
             "git": "https://github.com/keybase/pykeybasebot.git",
-            "ref": "f0421691304b22fd50702641c3737f93704b06b6"
+            "ref": "862c85c73158c6005d66bfed71325044008bbdb0"
         },
         "pysha3": {
             "hashes": [

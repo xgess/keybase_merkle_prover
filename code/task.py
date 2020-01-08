@@ -9,6 +9,7 @@ from typing import List
 
 import pykeybasebot.types.chat1 as chat1
 
+from async_helpers import retry_if_timeout
 import kb_ots
 import last_success
 from merkle_root import fetch_keybase_merkle_root, MerkleRoot
@@ -58,20 +59,6 @@ async def broadcast_new_root(logger, bot):
         logger.error(f"error broadcasting preliminary stamp: {e}")
         raise
     logger.info(f"broadcasted {merkle_root.seqno} at msg_id {res.message_id}")
-
-
-async def retry_if_timeout(logger, func, *args, **kwargs):
-    for i in range(0, 100):
-        try:
-            result = await func(*args, **kwargs)
-        except asyncio.TimeoutError:
-            logger.error(f"got a timeout error on attempt {i+1}. retrying...")
-            await asyncio.sleep(0.5)
-            continue
-        break
-    else:
-        raise asyncio.TimeoutError("retries exhausted :(")
-    return result
 
 
 async def update_messages(logger, bot):

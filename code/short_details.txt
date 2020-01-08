@@ -1,0 +1,2 @@
+Hi. I'm a chat bot that's doing a few things on timers, and posting the results to my public channel. I respond to the commands:
+`!details` => what am I doing
