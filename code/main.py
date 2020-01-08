@@ -1,11 +1,12 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 
 from pykeybasebot import Bot
 
-from interactivity import new_bot, start_bot
+from interactivity import new_bot, start_bot, Seppuku
 import last_success
 from task import broadcast_new_root, update_messages
 
@@ -39,13 +40,45 @@ async def update_proof_loop(bot: Bot):
 
 ################################
 
-# run everything
-async def do_it():
-    bot = new_bot()
-    await asyncio.gather(
+# set up an event loop with graceful shutdown
+
+loop = asyncio.get_event_loop()
+
+async def shutdown(loop, signal=None):
+    logging.info(f"received exit signal: {signal}")
+    tasks = [t for t in asyncio.all_tasks() if t is not
+             asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+
+    logging.info("cancelling outstanding tasks")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    loop.stop()
+
+def handle_exception(loop, context):
+    msg = context.get("exception", context["message"])
+    logging.error(f"shutting down because of exception: {msg}")
+    asyncio.create_task(shutdown(loop))
+
+loop.set_exception_handler(handle_exception)
+
+signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+for s in signals:
+    loop.add_signal_handler(
+        s, lambda s=s: asyncio.create_task(shutdown(loop, s)))
+
+
+# add the tasks and start running
+try:
+    bot = new_bot(loop)
+    logging.info(f"starting up an event loop for {bot.username}")
+    tasks = asyncio.gather(
         start_bot(bot),
         new_proof_loop(bot),
         update_proof_loop(bot),
+        return_exceptions=True,
     )
-
-asyncio.run(do_it())
+    loop.run_until_complete(tasks)
+finally:
+    logging.info("successfully shut down")
+    loop.close()

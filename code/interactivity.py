@@ -11,6 +11,10 @@ import last_success
 from merkle_root import KEYBASE_MERKLE_ROOT_URL
 
 
+class Seppuku(Exception):
+    pass
+
+
 async def bot_send(bot, channel, message):
     logger = logging.getLogger('bot_handler')
     return await retry_if_timeout(logger, bot.chat.send, channel, message)
@@ -31,6 +35,8 @@ async def handler(bot, event):
 
     command, *other_words = body.split(' ')
     message = ' '.join(other_words)
+    if is_admin and (command == "!kill"):
+        raise Seppuku(f"{sender} has requested we kill ourself")
     if is_admin and (command == "!logsend"):
         await bot_send(bot, channel, f"sending your logs with message '{message}'...")
         await retry_if_timeout(logger, bot.logsend, message)
@@ -50,11 +56,12 @@ async def handler(bot, event):
         await bot_send(bot, channel, msg)
 
 
-def new_bot() -> Bot:
+def new_bot(loop) -> Bot:
     return Bot(
         username=os.environ["KEYBASE_USERNAME"],
         paperkey=os.environ["KEYBASE_PAPERKEY"],
         handler=handler,
+        loop=loop,
     )
 
 async def start_bot(bot: Bot):
