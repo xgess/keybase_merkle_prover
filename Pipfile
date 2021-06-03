@@ -10,7 +10,7 @@ python_version = '3.7'
 ipython = "*"
 
 [packages]
-pykeybasebot = {ref = "xgess/add-public-broadcast",git = "https://github.com/keybase/pykeybasebot.git"}
+pykeybasebot = {ref = "e9ae95e24d596fefe7c5b332d8c5cb601cc5d19c",git = "https://github.com/keybase/pykeybasebot.git"}
 requests = "*"
 opentimestamps = "*"
 opentimestamps-client = "*"
